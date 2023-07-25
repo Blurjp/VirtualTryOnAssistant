@@ -39,7 +39,7 @@ def view():
     os.system(terminnal_command)
     
     print("inference end")
-    return render_template('view.html', data_list=data_list)  # html을 렌더하며 DB에서 받아온 값들을 넘김
+    return render_template('view.html', data_list=data_list)
  
 if __name__ == '__main__':
     app.run()
