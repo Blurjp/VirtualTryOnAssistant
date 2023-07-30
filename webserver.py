@@ -1,11 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for
-from flask_ngrok import run_with_ngrok
+#from flask_ngrok import run_with_ngrok
 from werkzeug.utils import secure_filename
 from PIL import Image
 import os
 
 app = Flask(__name__)
-run_with_ngrok(app)
+#run_with_ngrok(app)
 
 data_list = []
 

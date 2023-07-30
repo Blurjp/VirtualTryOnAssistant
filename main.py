@@ -1,13 +1,25 @@
 import os, sys
-import cv2
 from PIL import Image
 import numpy as np
 import glob
 import warnings
 import argparse
+
+#sys.path.append('/opt/conda/lib/python3.8')
+#sys.path.append('/opt/conda/lib/python3.8/lib-dynload')
+#if "cv2" in sys.path:
+#    print("The cv2 library is installed.")
+#else:
+#    print("The cv2 library is not installed.", sys.path)
+
+import cv2
 from cloths_segmentation.pre_trained_models import create_model
 
 if __name__ == '__main__':
+
+    #contents = list_site_packages()
+    #print(contents)
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--background', type=bool, default=True, help='Define removing background or not')
     opt = parser.parse_args()
