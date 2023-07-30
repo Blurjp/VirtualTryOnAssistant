@@ -37,3 +37,11 @@ https://github.com/Gaoyiminggithub/Graphonomy
 https://github.com/facebookresearch/detectron2
 #### cloth image segmentation
 https://github.com/ternaus/cloths_segmentation
+
+
+
+docker command: 
+docker build -f .\docker\Dockerfile -t virtualtryonassistant .
+
+docker run --gpus all -it -p 5000:5000 -v H:/VirtualTryOnAssistant:/VirtualTryOnAssistant virtualtryonassistant
+
