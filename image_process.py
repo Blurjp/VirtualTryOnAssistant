@@ -7,9 +7,16 @@ import requests
 from PIL import Image
 from io import BytesIO
 import argparse
+from utils import get_config
 
-s3 = boto3.client('s3')
-bucket_name = 'your-bucket-name'  # replace with your bucket name
+# Create the S3 client
+config = get_config()
+s3 = boto3.client('s3',
+                  aws_access_key_id=config['YOUR_AWS_ACCESS_KEY_ID'],
+                  aws_secret_access_key=config['YOUR_AWS_SECRET_ACCESS_KEY'],
+                  region_name=config['YOUR_AWS_REGION_NAME'])
+
+generatedImageS3Bucket = config['S3_PROFILE_IMAGE_BUCKET_NAME']
 
 def image_process(image1_url, image2_url, user_id):
     parser = argparse.ArgumentParser()
