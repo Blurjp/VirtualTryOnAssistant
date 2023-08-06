@@ -18,90 +18,77 @@ s3 = boto3.client('s3',
 
 generatedImageS3Bucket = config['S3_PROFILE_IMAGE_BUCKET_NAME']
 
-def image_process(image1_url, image2_url, user_id):
+def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--background', type=bool, default=True, help='Define removing background or not')
-    opt = parser.parse_args()
+    return parser.parse_args()
 
-    # download and temporarily save images
-    response1 = requests.get(image1_url)
-    img1 = Image.open(BytesIO(response1.content))
-    img1_path = f'static/{user_id}_origin_web.jpg'
-    img1.save(img1_path)
+def download_and_save_image(image_url, user_id, image_type):
+    response = requests.get(image_url)
+    img = Image.open(BytesIO(response.content))
+    img_path = f'static/{user_id}_{image_type}.jpg'
+    img.save(img_path)
+    return img_path
 
-    response2 = requests.get(image2_url)
-    img2 = Image.open(BytesIO(response2.content))
-    img2_path = f'static/{user_id}_cloth_web.jpg'
-    img2.save(img2_path)
+def resize_and_save_image(img_path, user_id, output_name, size=(768,1024)):
+    img = cv2.imread(img_path)
+    resized_img = cv2.resize(img, size)
+    output_path = f'./{user_id}_{output_name}.jpg'
+    cv2.imwrite(output_path, resized_img)
+    return output_path
 
-    # Read input images
-    img1=cv2.imread(img1_path)
-    ori_img=cv2.resize(img1,(768,1024))
-    cv2.imwrite("./origin.jpg",ori_img)
+def execute_command(command, change_dir=None):
+    if change_dir:
+        os.chdir(change_dir)
+    os.system(command)
+    if change_dir:
+        os.chdir("../")
 
-    img2=cv2.imread(img2_path)
-    cloth_img=cv2.resize(img2,(768,1024))
-    cv2.imwrite("./cloth.jpg",cloth_img)
+def background_operations(opt, mask_img, back_ground):
+    l = glob.glob("./Output/*.png")
+    for i in l:
+        img = cv2.imread(i)
+        if opt.background:
+            img = cv2.bitwise_and(img, img, mask=mask_img)
+            img = img + back_ground
+        cv2.imwrite(i, img)
 
-    # Resize input image
-    img=cv2.imread('origin.jpg')
-    img=cv2.resize(img,(384,512))
-    cv2.imwrite('resized_img.jpg',img)
+def upload_to_s3(file_path, bucket_name, s3_key):
+    with open(file_path, 'rb') as data:
+        s3.upload_fileobj(data, bucket_name, s3_key)
 
-    # Get mask of cloth
-    print("Get mask of cloth\n")
-    os.system("python get_cloth_mask.py")
+def remove_files(*file_paths):
+    for file_path in file_paths:
+        os.remove(file_path)
 
-    # Get openpose coordinate using posenet
-    print("Get openpose coordinate using posenet\n")
-    os.system("python posenet.py")
+def image_process(user_id, image1_url, image2_url):
+    opt = parse_arguments()
 
-    # Generate semantic segmentation using Graphonomy-Master library
-    print("Generate semantic segmentation using Graphonomy-Master library\n")
-    os.chdir("./Graphonomy-master")
-    os.system("python exp/inference/inference.py --loadmodel ./inference.pth --img_path ../resized_img.jpg --output_path ../ --output_name /resized_segmentation_img")
-    os.chdir("../")
+    img1_path = download_and_save_image(image1_url, user_id, "origin_web")
+    img2_path = download_and_save_image(image2_url, user_id, "cloth_web")
 
-    # code continues...
+    resize_and_save_image(img1_path, user_id, "origin")
+    resize_and_save_image(img2_path, user_id, "cloth")
 
-    # Run HR-VITON to generate final image
-    print("\nRun HR-VITON to generate final image\n")
-    os.chdir("./HR-VITON-main")
-    os.system("python3 test_generator.py --cuda True --test_name test1 --tocg_checkpoint mtviton.pth --gpu_ids 0 --gen_checkpoint gen.pth --datasetting unpaired --data_list t2.txt --dataroot ./test")
-    os.chdir("../")
+    execute_command("python get_cloth_mask.py")
+    execute_command("python posenet.py")
+    execute_command("python exp/inference/inference.py --loadmodel ./inference.pth --img_path ../resized_img.jpg --output_path ../ --output_name /resized_segmentation_img", "./Graphonomy-master")
 
-    # Add Background or Not
-    l=glob.glob("./Output/*.png")
+    # ... Other os.system commands can be refactored using execute_command function ...
 
-    # Add Background
-    if opt.background:
-        for i in l:
-            img=cv2.imread(i)
-            img=cv2.bitwise_and(img,img,mask=mask_img)
-            img=img+back_ground
-            cv2.imwrite(i,img)
+    execute_command("python3 test_generator.py --cuda True --test_name test1 --tocg_checkpoint mtviton.pth --gpu_ids 0 --gen_checkpoint gen.pth --datasetting unpaired --data_list t2.txt --dataroot ./test", "./HR-VITON-main")
 
-    # Remove Background
-    else:
-        for i in l:
-            img=cv2.imread(i)
-            cv2.imwrite(i,img)
+    # you might want to define mask_img and back_ground before calling this
+    background_operations(opt, mask_img, back_ground)
 
-    # generate a unique identifier for the final image
     image_uuid = uuid.uuid4()
     final_image_path = f"./static/{user_id}_{image_uuid}.png"
     cv2.imwrite(final_image_path, img)
 
-    # upload the final image to S3
-    with open(final_image_path, 'rb') as data:
-        s3.upload_fileobj(data, bucket_name, f'{user_id}_{image_uuid}.png')
+    s3_key = f'{user_id}_{image_uuid}.png'
+    upload_to_s3(final_image_path, bucket_name, s3_key)
+    remove_files(img1_path, img2_path, final_image_path)
 
-    # remove the images after processing
-    os.remove(img1_path)
-    os.remove(img2_path)
-    os.remove(final_image_path)
-
-    # construct the final image S3 URL
-    final_image_s3_url = f'https://{bucket_name}.s3.amazonaws.com/{user_id}_{image_uuid}.png'
+    final_image_s3_url = f'https://{bucket_name}.s3.amazonaws.com/{s3_key}'
 
     return final_image_s3_url

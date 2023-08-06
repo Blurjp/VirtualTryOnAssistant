@@ -1,7 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
-#from flask_ngrok import run_with_ngrok
-#from werkzeug.utils import secure_filename
-#from PIL import Image
+from image_process import image_process
 import os
 
 app = Flask(__name__)
@@ -18,11 +16,11 @@ def accept_images():
     data = request.get_json()
 
     user_id = data['user_id']
-    image1_url = data['image1_url']
-    image2_url = data['image2_url']
+    profile_image_url = data['profile_image_url']
+    cloth_image_url = data['cloth_image_url']
 
     # run main.py
-    final_image_s3_url = main.main(user_id, image1_url, image2_url)
+    final_image_s3_url = image_process(user_id, profile_image_url, cloth_image_url)
     return jsonify({"final_image_s3_url": final_image_s3_url})
 
 @app.route('/fileUpload', methods = ['GET', 'POST'])
